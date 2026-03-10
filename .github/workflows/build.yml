@@ -20,13 +20,15 @@ jobs:
     - name: Install dependencies
       run: |
         python -m pip install --upgrade pip
-        pip install python-barcode pillow customtkinter pyinstaller
+        # 💡 [요청사항 반영] QR 코드 생성을 위해 qrcode 라이브러리 추가 설치
+        pip install python-barcode pillow customtkinter pyinstaller qrcode
 
     - name: Build with PyInstaller
-      run: pyinstaller --noconsole --onefile barcode_app.py
+      run: pyinstaller --noconsole --onefile --add-data "arial.ttf;." barcode_app.py
+      # 💡 [요청사항 반영] arial.ttf 폰트 파일을 프로그램 안에 심어서 cannot open resource 에러 방지
 
     - name: Upload EXE
       uses: actions/upload-artifact@v4
       with:
-        name: barcode-maker-exe
+        name: barcode-maker-space-exe
         path: dist/barcode_app.exe
