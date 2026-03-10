@@ -208,7 +208,7 @@ def add_to_history(data, b_type, img):
         history_list.pop()
     display_history_list()
 
-
+ 
 # --- 메인 창 세팅 ---
 root = ctk.CTk()
 root.title("Warehouse Pro v4.6 - Seoul Night View")
