@@ -28,7 +28,7 @@ jobs:
 
     - name: Build with PyInstaller
       # 💡 폰트와 서울 야경 사진을 한 번에 묶어서 exe 파일로 만듭니다.
-      run: pyinstaller --noconsole --onefile --add-data "arial.ttf;." --add-data "seoul_night.jpg;." barcode_app.py
+      run: pyinstaller --noconsole --onefile --add-data "arial.ttf;." --add-data "logistic_future.jpg;." barcode_app.py
 
     - name: Upload EXE
       uses: actions/upload-artifact@v4
