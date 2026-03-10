@@ -11,7 +11,7 @@ jobs:
     steps:
     - name: Checkout code
       uses: actions/checkout@v4
-  
+
     - name: Set up Python
       uses: actions/setup-python@v5
       with:
@@ -20,15 +20,18 @@ jobs:
     - name: Install dependencies
       run: |
         python -m pip install --upgrade pip
-        # 💡 [요청사항 반영] QR 코드 생성을 위해 qrcode 라이브러리 추가 설치
         pip install python-barcode pillow customtkinter pyinstaller qrcode
 
+    - name: Prepare Font
+      # 💡 [핵심 복구] 윈도우 시스템에서 폰트를 복사해오는 단계입니다. 이 부분이 빠지면 에러가 납니다!
+      run: copy C:\Windows\Fonts\arial.ttf .
+
     - name: Build with PyInstaller
-      # 💡 [요청사항 반영] arial.ttf 폰트 파일과 seoul_night.jpg 사진 파일을 프로그램 안에 심습니다.
+      # 💡 폰트와 서울 야경 사진을 한 번에 묶어서 exe 파일로 만듭니다.
       run: pyinstaller --noconsole --onefile --add-data "arial.ttf;." --add-data "seoul_night.jpg;." barcode_app.py
 
     - name: Upload EXE
       uses: actions/upload-artifact@v4
       with:
-        name: barcode-maker-seoul-exe # 산출물 파일 이름을 세련되게 변경
+        name: barcode-maker-seoul-exe
         path: dist/barcode_app.exe
