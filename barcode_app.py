@@ -2,7 +2,7 @@ import customtkinter as ctk
 from tkinter import messagebox
 import barcode
 from barcode.writer import ImageWriter
-from PIL import Image, ImageDraw, ImageFont
+from PIL import Image, ImageDraw, ImageFont, ImageOps # 💡 고화질 리사이징을 위해 ImageOps 추가
 import io
 import os
 import qrcode
@@ -56,7 +56,6 @@ def generate_barcode():
             barcode_img = qr.make_image(fill_color="black", back_color="white").convert('RGBA')
             lw = 60
             icqa_logo = get_icqa_logo(lw)
-            # 💡 [요청 반영] QR 코드 우측 상단 자연스러운 위치에 로고 배치
             barcode_img.paste(icqa_logo, (barcode_img.size[0] - lw - 15, 15), icqa_logo)
             final_img = barcode_img
             
@@ -77,19 +76,16 @@ def generate_barcode():
             icqa_logo = get_icqa_logo(lw)
             margin = 15
             
-            # 💡 [요청 반영] 바코드 우측 상단에 로고를 넣기 위해 캔버스를 살짝 확장
             new_w = barcode_img.size[0] + lw + margin
             new_h = barcode_img.size[1]
             final_img = Image.new('RGBA', (new_w, new_h), 'white')
             final_img.paste(barcode_img, (0, 0))
             
-            # 우측(new_w - lw - margin) 상단(margin=15)에 로고 착장
             final_img.paste(icqa_logo, (new_w - lw - margin, margin), icqa_logo)
         
         current_barcode_pil = final_img
         current_barcode_data = data
         
-        # 미리보기 이미지 세팅
         display_w = 480
         display_h = int(final_img.size[1] * (display_w / final_img.size[0]))
         img_ctk = ctk.CTkImage(light_image=final_img, dark_image=final_img, size=(display_w, display_h))
@@ -98,25 +94,42 @@ def generate_barcode():
         barcode_label.image = img_ctk
         save_button.configure(state="normal", fg_color="#2FA572")
         
-        # 히스토리에 추가
         add_to_history(data, b_type, final_img)
 
     except Exception as e:
         messagebox.showerror("오류", f"바코드 생성 중 문제가 발생했습니다:\n{e}")
 
-# 💡 [요청 반영] 히스토리 UI: 바코드 종류와 데이터 모두 표시
+# 💡 [신규 기능] 히스토리 개별 삭제 함수
+def delete_history_item(index):
+    global history_list
+    history_list.pop(index) # 리스트에서 해당 아이템 제거
+    display_history_list()  # 화면 새로고침
+
+# 💡 [기능 업그레이드] 히스토리 UI: 삭제 버튼 추가
 def display_history_list():
     for widget in history_scroll.winfo_children():
         widget.destroy()
+        
     for i, item in enumerate(history_list):
+        # 개별 아이템을 묶어줄 투명 프레임
+        item_frame = ctk.CTkFrame(history_scroll, fg_color="transparent")
+        item_frame.pack(side="left", padx=10)
+        
+        # 메인 버튼 (클릭 시 복구)
         btn_text = f"[{item['type']}]\n{item['data']}"
-        btn = ctk.CTkButton(history_scroll, text=btn_text, font=ctk.CTkFont(size=12), 
+        btn = ctk.CTkButton(item_frame, text=btn_text, font=ctk.CTkFont(size=12), 
                              fg_color="#1e293b", hover_color="#334155", corner_radius=10,
-                             height=60, width=180,
-                             command=lambda index=i: display_history_item(index))
-        btn.pack(side="left", padx=10)
+                             height=60, width=160,
+                             command=lambda idx=i: display_history_item(idx))
+        btn.pack(side="left")
+        
+        # 💡 삭제 버튼 (빨간색 ✖ 기호)
+        del_btn = ctk.CTkButton(item_frame, text="✖", font=ctk.CTkFont(size=12, weight="bold"),
+                                fg_color="#ef4444", hover_color="#dc2626", corner_radius=8,
+                                height=60, width=30,
+                                command=lambda idx=i: delete_history_item(idx))
+        del_btn.pack(side="left", padx=(5, 0))
 
-# 💡 [요청 반영] 과거 내역 클릭 시 중복 생성 안 하고 화면만 바로 업데이트
 def display_history_item(index):
     global current_barcode_pil, current_barcode_data
     item = history_list[index]
@@ -136,7 +149,6 @@ def display_history_item(index):
     entry.insert(0, current_barcode_data)
     type_combo.set(item['type'])
     save_button.configure(state="normal", fg_color="#2FA572")
-    # 💡 generate_barcode()를 호출하지 않으므로 히스토리에 무한 증식되지 않습니다!
 
 def save_barcode():
     if current_barcode_pil:
@@ -161,34 +173,34 @@ def add_to_history(data, b_type, img):
 
 # --- 메인 창 세팅 ---
 root = ctk.CTk()
-root.title("Warehouse Pro v4.4 - Seoul Night View")
+root.title("Warehouse Pro v4.5 - Seoul Night View")
 root.geometry("1000x800") 
 
-# 💡 [요청 반영] 창을 아무리 키워도 서울 야경 배경이 짤리지 않게 초대형 사이즈로 덮기
+# 💡 [화질 최적화] 사진 비율을 유지하면서 고화질로 꽉 채우기
 try:
     bg_image_path = resource_path("seoul_night.jpg")
     bg_pil = Image.open(bg_image_path)
-    # 배경 해상도를 2560x1440으로 아주 크게 설정하여 화면 전체를 꽉 채웁니다.
-    bg_ctk = ctk.CTkImage(light_image=bg_pil, dark_image=bg_pil, size=(2560, 1440))
+    
+    # LANCZOS 필터를 사용하여 화질 저하 없이 초대형(2560x1440) 해상도로 크롭 & 리사이즈
+    bg_pil_high_res = ImageOps.fit(bg_pil, (2560, 1440), Image.Resampling.LANCZOS)
+    bg_ctk = ctk.CTkImage(light_image=bg_pil_high_res, dark_image=bg_pil_high_res, size=(2560, 1440))
+    
     bg_label = ctk.CTkLabel(root, text="", image=bg_ctk)
-    bg_label.place(relx=0.5, rely=0.5, anchor="center") # 항상 정중앙 위치
+    bg_label.place(relx=0.5, rely=0.5, anchor="center") 
 except:
     bg_frame = ctk.CTkFrame(root, corner_radius=0, fg_color="#0a0f1e")
     bg_frame.place(relx=0.5, rely=0.5, anchor="center", relwidth=1.0, relheight=1.0)
     bg_label = bg_frame
 
-# 투명한 UI 메인 컨테이너
 main_container = ctk.CTkFrame(root, corner_radius=25, fg_color=("#333333", "#141414"), border_width=1, border_color="#333333")
 main_container.place(relx=0.5, rely=0.5, anchor="center", relwidth=0.85, relheight=0.85)
 
 header_label = ctk.CTkLabel(main_container, text="Logistics Barcode Generator", font=ctk.CTkFont(size=36, weight="bold"), text_color="#E0E0E0")
 header_label.pack(pady=(50, 40))
 
-# 💡 [요청 반영] 창을 키워도 콤보박스, 입력창, 버튼이 무조건 '가운데' 정렬되도록 수정
 input_row_container = ctk.CTkFrame(main_container, fg_color="transparent")
 input_row_container.pack(fill="x", pady=(0, 20))
 
-# anchor="center"를 통해 input_card 내부의 모든 요소를 가운데로 끌어모음
 input_card = ctk.CTkFrame(input_row_container, fg_color="transparent")
 input_card.pack(anchor="center") 
 
@@ -203,7 +215,6 @@ entry.bind("<Return>", lambda event: generate_barcode())
 generate_btn = ctk.CTkButton(input_card, text="생성", width=120, height=60, font=ctk.CTkFont(size=18, weight="bold"), command=generate_barcode)
 generate_btn.pack(side="left")
 
-# 바코드 디스플레이 화면
 barcode_display_frame = ctk.CTkFrame(main_container, width=700, height=320, fg_color="white", corner_radius=15, border_width=1, border_color="gray80")
 barcode_display_frame.pack(pady=30, padx=40)
 barcode_display_frame.pack_propagate(False)
@@ -211,7 +222,6 @@ barcode_display_frame.pack_propagate(False)
 barcode_label = ctk.CTkLabel(barcode_display_frame, text="Barcode Preview", text_color="gray60", font=ctk.CTkFont(size=14))
 barcode_label.pack(expand=True)
 
-# 생성 히스토리
 ctk.CTkLabel(main_container, text="생성 히스토리", font=ctk.CTkFont(size=14, weight="bold"), text_color="#A0A0A0").pack(pady=(10, 5))
 
 history_scroll = ctk.CTkScrollableFrame(main_container, height=100, orientation="horizontal", fg_color="transparent", scrollbar_button_color=("gray60", "gray40"), border_width=0)
