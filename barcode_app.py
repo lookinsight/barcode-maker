@@ -178,7 +178,7 @@ root.geometry("1000x800")
 
 # 💡 [화질 최적화] 사진 비율을 유지하면서 고화질로 꽉 채우기
 try:
-    bg_image_path = resource_path("seoul_night.jpg")
+    bg_image_path = resource_path("logistic_future.jpg")
     bg_pil = Image.open(bg_image_path)
     
     # LANCZOS 필터를 사용하여 화질 저하 없이 초대형(2560x1440) 해상도로 크롭 & 리사이즈
