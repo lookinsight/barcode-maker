@@ -22,7 +22,7 @@ ctk.set_default_color_theme("dark-blue")
 current_barcode_pil = None
 current_barcode_data = ""
 history_list = []
-favorites_list = [] # 💡 [추가] 자주 쓰는 바코드 저장 리스트
+favorites_list = []
 
 # 🏷️ ICQA 로고 생성
 def get_icqa_logo(size=55):
@@ -99,7 +99,7 @@ def generate_barcode():
     except Exception as e:
         messagebox.showerror("오류", f"바코드 생성 중 문제가 발생했습니다:\n{e}")
 
-# 💡 [신규] 즐겨찾기에 바코드 저장
+# ⭐ 즐겨찾기에 바코드 저장
 def add_to_favorites():
     global favorites_list
     data = entry.get()
@@ -122,15 +122,15 @@ def add_to_favorites():
     update_fav_combo()
     messagebox.showinfo("성공", f"[{b_type}] {data}\n자주 쓰는 바코드에 추가되었습니다!")
 
-# 💡 [신규] 즐겨찾기 목록 업데이트
+# ⭐ 즐겨찾기 목록 업데이트
 def update_fav_combo():
     vals = ["🌟 자주 쓰는 바코드 꺼내기..."] + [f"[{f['type']}] {f['data']}" for f in favorites_list]
     fav_combo.configure(values=vals)
+    fav_combo.set("🌟 자주 쓰는 바코드 꺼내기...")
 
-# 💡 [신규] 즐겨찾기 선택 시 불러오기
+# ⭐ 즐겨찾기 선택 시 불러오기
 def load_favorite(choice):
     if choice.startswith("🌟"): return
-    
     for f in favorites_list:
         if f"[{f['type']}] {f['data']}" == choice:
             entry.delete(0, 'end')
@@ -138,9 +138,77 @@ def load_favorite(choice):
             type_combo.set(f['type'])
             generate_barcode()
             break
-    fav_combo.set("🌟 자주 쓰는 바코드 꺼내기...") # 다시 초기 문구로 리셋
+    fav_combo.set("🌟 자주 쓰는 바코드 꺼내기...")
 
-# 히스토리 삭제
+# 💡 [신규] 즐겨찾기 관리 창 열기
+def open_manage_favorites():
+    manage_win = ctk.CTkToplevel(root)
+    manage_win.title("즐겨찾기 관리")
+    manage_win.geometry("450x450")
+    manage_win.transient(root)
+    manage_win.grab_set()
+
+    ctk.CTkLabel(manage_win, text="⚙️ 자주 쓰는 바코드 관리", font=ctk.CTkFont(size=18, weight="bold")).pack(pady=15)
+
+    scroll = ctk.CTkScrollableFrame(manage_win, fg_color="transparent")
+    scroll.pack(fill="both", expand=True, padx=20, pady=(0, 20))
+
+    def refresh_manage_list():
+        for w in scroll.winfo_children():
+            w.destroy()
+        
+        if not favorites_list:
+            ctk.CTkLabel(scroll, text="저장된 즐겨찾기가 없습니다.", text_color="gray").pack(pady=20)
+            return
+
+        for i, fav in enumerate(favorites_list):
+            frame = ctk.CTkFrame(scroll, fg_color="#1e293b", corner_radius=8)
+            frame.pack(fill="x", pady=5)
+            
+            lbl = ctk.CTkLabel(frame, text=f"[{fav['type']}] {fav['data']}", font=ctk.CTkFont(size=14))
+            lbl.pack(side="left", padx=15, pady=10)
+            
+            del_btn = ctk.CTkButton(frame, text="삭제", width=50, fg_color="#ef4444", hover_color="#dc2626", command=lambda idx=i: delete_fav(idx))
+            del_btn.pack(side="right", padx=(5, 10))
+            
+            edit_btn = ctk.CTkButton(frame, text="수정", width=50, fg_color="#3b82f6", hover_color="#2563eb", command=lambda idx=i: open_edit_fav(idx))
+            edit_btn.pack(side="right", padx=5)
+
+    def delete_fav(idx):
+        favorites_list.pop(idx)
+        update_fav_combo()
+        refresh_manage_list()
+
+    def open_edit_fav(idx):
+        edit_win = ctk.CTkToplevel(manage_win)
+        edit_win.title("수정")
+        edit_win.geometry("300x250")
+        edit_win.transient(manage_win)
+        edit_win.grab_set()
+
+        ctk.CTkLabel(edit_win, text="바코드 종류", font=ctk.CTkFont(weight="bold")).pack(pady=(20, 5))
+        edit_type_combo = ctk.CTkComboBox(edit_win, values=["Code 128", "Code 39", "QR Code"])
+        edit_type_combo.set(favorites_list[idx]['type'])
+        edit_type_combo.pack()
+
+        ctk.CTkLabel(edit_win, text="바코드 데이터", font=ctk.CTkFont(weight="bold")).pack(pady=(15, 5))
+        edit_data_entry = ctk.CTkEntry(edit_win, width=200)
+        edit_data_entry.insert(0, favorites_list[idx]['data'])
+        edit_data_entry.pack()
+
+        def save_edit():
+            new_data = edit_data_entry.get()
+            if not new_data: return
+            favorites_list[idx]['type'] = edit_type_combo.get()
+            favorites_list[idx]['data'] = new_data
+            update_fav_combo()
+            refresh_manage_list()
+            edit_win.destroy()
+
+        ctk.CTkButton(edit_win, text="저장", width=100, fg_color="#2FA572", hover_color="#1D7A50", command=save_edit).pack(pady=20)
+
+    refresh_manage_list()
+
 def delete_history_item(index):
     global history_list
     history_list.pop(index)
@@ -161,7 +229,6 @@ def display_history_list():
                              command=lambda idx=i: display_history_item(idx))
         btn.pack(side="left")
         
-        # 💡 [수정] ✖ 기호 대신 "삭제" 텍스트 적용
         del_btn = ctk.CTkButton(item_frame, text="삭제", font=ctk.CTkFont(size=12, weight="bold"),
                                 fg_color="#ef4444", hover_color="#dc2626", corner_radius=8,
                                 height=60, width=45,
@@ -208,14 +275,14 @@ def add_to_history(data, b_type, img):
         history_list.pop()
     display_history_list()
 
- 
+
 # --- 메인 창 세팅 ---
 root = ctk.CTk()
-root.title("Warehouse Pro v4.6 - Seoul Night View")
+root.title("Warehouse Pro v4.7 - Seoul Night View")
 root.geometry("1000x800") 
 
 try:
-    bg_image_path = resource_path("logistic_future.jpg")
+    bg_image_path = resource_path("seoul_night.jpg")
     bg_pil = Image.open(bg_image_path)
     bg_pil_high_res = ImageOps.fit(bg_pil, (2560, 1440), Image.Resampling.LANCZOS)
     bg_ctk = ctk.CTkImage(light_image=bg_pil_high_res, dark_image=bg_pil_high_res, size=(2560, 1440))
@@ -236,12 +303,15 @@ header_label.pack(pady=(40, 30))
 input_row_container = ctk.CTkFrame(main_container, fg_color="transparent")
 input_row_container.pack(fill="x", pady=(0, 20))
 
-# 💡 [추가] 즐겨찾기 불러오기 (드롭다운 메뉴)
 fav_row = ctk.CTkFrame(input_row_container, fg_color="transparent")
 fav_row.pack(anchor="center", pady=(0, 10))
 
 fav_combo = ctk.CTkOptionMenu(fav_row, values=["🌟 자주 쓰는 바코드 꺼내기..."], width=300, height=35, font=ctk.CTkFont(size=14), command=load_favorite, fg_color="#334155", button_color="#1e293b", button_hover_color="#475569")
-fav_combo.pack(side="top")
+fav_combo.pack(side="left")
+
+# 💡 [추가] 즐겨찾기 관리 버튼
+fav_manage_btn = ctk.CTkButton(fav_row, text="⚙️ 관리", width=60, height=35, font=ctk.CTkFont(size=14), fg_color="#475569", hover_color="#334155", command=open_manage_favorites)
+fav_manage_btn.pack(side="left", padx=(10, 0))
 
 input_card = ctk.CTkFrame(input_row_container, fg_color="transparent")
 input_card.pack(anchor="center") 
@@ -257,7 +327,6 @@ entry.bind("<Return>", lambda event: generate_barcode())
 generate_btn = ctk.CTkButton(input_card, text="생성", width=100, height=60, font=ctk.CTkFont(size=18, weight="bold"), command=generate_barcode)
 generate_btn.pack(side="left")
 
-# 💡 [추가] 즐겨찾기 저장 버튼 추가 (우측에 배치)
 fav_add_btn = ctk.CTkButton(input_card, text="⭐ 저장", width=80, height=60, font=ctk.CTkFont(size=16, weight="bold"), fg_color="#f59e0b", hover_color="#d97706", command=add_to_favorites)
 fav_add_btn.pack(side="left", padx=(15, 0))
 
@@ -276,7 +345,6 @@ history_scroll.pack(fill="x", padx=40, pady=5)
 save_button = ctk.CTkButton(main_container, text="Save as PNG", width=250, height=45, font=ctk.CTkFont(size=16), state="disabled", fg_color="gray", command=save_barcode)
 save_button.pack(pady=(10, 15))
 
-# 💡 [추가] 하단 제작자 크레딧 명시
 credit_label = ctk.CTkLabel(main_container, text="Designed & Developed by Theo with Gemini", font=ctk.CTkFont(size=12, slant="italic"), text_color="#64748b")
 credit_label.pack(side="bottom", pady=(0, 15))
 
