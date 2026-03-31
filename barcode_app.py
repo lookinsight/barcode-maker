@@ -47,32 +47,32 @@ def save_favorites_to_file():
         json.dump(favorites_list, f, ensure_ascii=False, indent=4)
 
 def create_final_barcode_image(barcode_img, data, product_name):
-    lw, margin = 55, 20
-    header_height = 50 if product_name else 10
+    # 💡 [수정] ICQA 로고 영역(lw) 삭제 및 여백 조정
+    margin = 25
+    header_height = 60 if product_name else 10
     
-    new_w = barcode_img.size[0] + lw + margin
+    new_w = barcode_img.size[0] + (margin * 2)
     new_h = barcode_img.size[1] + header_height
     final_img = Image.new('RGBA', (new_w, new_h), 'white')
     draw = ImageDraw.Draw(final_img)
     
-    # 💡 [수정] 한글 지원을 위해 맑은 고딕(malgun.ttf) 우선 적용
+    # 💡 [수정] 상품명 폰트 크기를 더 크게 (22pt -> 26pt로 1~2단계 업)
     try:
-        font = ImageFont.truetype("malgun.ttf", 16)
-        title_font = ImageFont.truetype("malgun.ttf", 20)
+        # 깃허브 배포를 위해 malgun.ttf 사용. (로컬 테스트 시 경로 수정 필요할 수 있음)
+        font_p = resource_path("malgun.ttf")
+        title_font = ImageFont.truetype(font_p, 26) 
     except:
-        font = title_font = ImageFont.load_default()
+        title_font = ImageFont.load_default()
 
+    # 💡 [수정] "ITEM:" 제거하고 상품명만 표시
     if product_name:
-        draw.text((margin, 10), f"ITEM: {product_name}", font=title_font, fill="black")
+        # 텍스트 세로 중앙 정렬을 위해 header_height 고려
+        text_w, text_h = draw.textsize(product_name, font=title_font)
+        draw.text((margin, (header_height - text_h) // 2), product_name, font=title_font, fill="black")
 
-    final_img.paste(barcode_img, (0, header_height))
+    final_img.paste(barcode_img, (margin, header_height))
     
-    logo_size = 50
-    logo = Image.new('RGBA', (logo_size, logo_size), (0,0,0,0))
-    l_draw = ImageDraw.Draw(logo)
-    l_draw.rounded_rectangle((0, 0, logo_size, logo_size), radius=12, fill="#333333")
-    l_draw.text((8, 15), "ICQA", font=font, fill="white")
-    final_img.paste(logo, (new_w - logo_size - 15, 15), logo)
+    # ICQA 로고 그리는 코드 삭제 완료
     
     return final_img
 
@@ -88,6 +88,7 @@ def generate_barcode():
         
     try:
         fp = io.BytesIO()
+        # 바코드 데이터 숫자 폰트 (Arial 사용)
         font_p = resource_path("arial.ttf") 
 
         if b_type == "QR Code":
@@ -98,7 +99,9 @@ def generate_barcode():
         else:
             code_class = barcode.get_barcode_class(b_type.lower().replace(" ", ""))
             my_barcode = code_class(data, writer=ImageWriter())
-            options = {"write_text": True, "font_size": 10, "dpi": 300, "font_path": font_p}
+            
+            # 💡 [수정] 바코드 데이터 글자 크기를 더 작게 (10pt -> 8pt로 축소)
+            options = {"write_text": True, "font_size": 8, "dpi": 300, "font_path": font_p, "text_distance": 3.0}
             my_barcode.write(fp, options=options) 
             barcode_img = Image.open(fp).convert('RGBA')
         
@@ -106,7 +109,7 @@ def generate_barcode():
         current_barcode_pil = final_img
         current_barcode_data = data
         
-        # 💡 [수정] 프리뷰 박스(600x250)에 맞춰 이미지가 잘리지 않게 '비율 자동 조절'
+        # 프리뷰 박스 비율 조절
         max_w, max_h = 560, 230 
         img_w, img_h = final_img.size
         ratio = min(max_w / img_w, max_h / img_h)
@@ -121,6 +124,8 @@ def generate_barcode():
         
     except Exception as e:
         messagebox.showerror("오류", f"생성 실패: {e}")
+
+# ... [중략: print_barcode, 즐겨찾기 관련 함수는 v5.1과 동일] ...
 
 def print_barcode(size_mode):
     if not current_barcode_pil: return
@@ -174,10 +179,9 @@ def load_favorite(choice):
 
 # --- UI 메인 구성 ---
 root = ctk.CTk()
-root.title("Warehouse Pro v5.1 - Logistics Expert")
+root.title("Warehouse Pro v5.2 - Logistics Expert") # 버전 업데이트
 root.geometry("1100x850")
 
-# 💡 배경 이미지 (파일이 없으면 까만 배경 유지)
 try:
     bg_image_path = resource_path("logistic_future.jpg")
     bg_pil = Image.open(bg_image_path)
@@ -195,7 +199,7 @@ main_container.place(relx=0.5, rely=0.5, anchor="center", relwidth=0.85, relheig
 header = ctk.CTkLabel(main_container, text="Logistics Barcode Generator", font=ctk.CTkFont(size=36, weight="bold"))
 header.pack(pady=30)
 
-product_entry = ctk.CTkEntry(main_container, width=500, height=45, placeholder_text="[상품명 입력] 바코드 상단에 인쇄됩니다.")
+product_entry = ctk.CTkEntry(main_container, width=500, height=45, placeholder_text="[상품명 입력] 바코드 상단에 크게 인쇄됩니다.")
 product_entry.pack(pady=(0, 15))
 
 input_frame = ctk.CTkFrame(main_container, fg_color="transparent")
