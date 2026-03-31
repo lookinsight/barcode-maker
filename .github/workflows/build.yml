@@ -1,4 +1,4 @@
-name: Build EXE
+name: Build EXE v5.2
 
 on:
   push:
@@ -22,16 +22,19 @@ jobs:
         python -m pip install --upgrade pip
         pip install python-barcode pillow customtkinter pyinstaller qrcode pywin32
 
-    - name: Prepare Font (Arial)
-      # 💡 Arial은 깃허브 로봇 컴퓨터에 기본으로 있으니 복사해 오라고 시킵니다.
-      run: copy C:\Windows\Fonts\arial.ttf .
+    - name: Prepare Fonts
+      # 💡 Arial은 깃허브 서버에 기본으로 있으니 복사합니다.
+      # ⚠️ malgun.ttf는 룩희님 깃허브 저장소에 직접 업로드해 두셨어야 합니다!
+      run: |
+        copy C:\Windows\Fonts\arial.ttf .
 
     - name: Build with PyInstaller
-      # 💡 [핵심] arial, malgun, 배경 이미지까지 3개를 몽땅 EXE 안에 묶어서 포장합니다!
-      run: pyinstaller --noconsole --onefile --add-data "arial.ttf;." --add-data "malgun.ttf;." --add-data "logistic_future.jpg;." --name "Warehouse_Pro_v5.1" barcode_app.py
+      # 💡 [핵심] 폰트 2개(arial, malgun)와 logistic_future.jpg 이미지를 모두 EXE에 포함합니다.
+      # 파일 이름을 Warehouse_Pro_v5.2로 명시합니다.
+      run: pyinstaller --noconsole --onefile --add-data "arial.ttf;." --add-data "malgun.ttf;." --add-data "logistic_future.jpg;." --name "Warehouse_Pro_v5.2" barcode_app.py
 
     - name: Upload EXE
       uses: actions/upload-artifact@v4
       with:
-        name: Warehouse_Pro_v5.1_EXE
-        path: dist/Warehouse_Pro_v5.1.exe
+        name: Warehouse_Pro_v5.2_EXE
+        path: dist/Warehouse_Pro_v5.2.exe
