@@ -16,7 +16,6 @@ try:
 except ImportError:
     pass
 
-# 💡 실행 환경 리소스 경로
 def resource_path(relative_path):
     try:
         base_path = sys._MEIPASS
@@ -56,10 +55,10 @@ def create_final_barcode_image(barcode_img, data, product_name):
     final_img = Image.new('RGBA', (new_w, new_h), 'white')
     draw = ImageDraw.Draw(final_img)
     
+    # 💡 [수정] 한글 지원을 위해 맑은 고딕(malgun.ttf) 우선 적용
     try:
-        font_path = resource_path("arial.ttf")
-        font = ImageFont.truetype(font_path, 16)
-        title_font = ImageFont.truetype(font_path, 20)
+        font = ImageFont.truetype("malgun.ttf", 16)
+        title_font = ImageFont.truetype("malgun.ttf", 20)
     except:
         font = title_font = ImageFont.load_default()
 
@@ -89,7 +88,6 @@ def generate_barcode():
         
     try:
         fp = io.BytesIO()
-        # 💡 핵심 수정: 바코드 번호 그릴 때 쓸 폰트 경로를 명확하게 지정!
         font_p = resource_path("arial.ttf") 
 
         if b_type == "QR Code":
@@ -100,7 +98,6 @@ def generate_barcode():
         else:
             code_class = barcode.get_barcode_class(b_type.lower().replace(" ", ""))
             my_barcode = code_class(data, writer=ImageWriter())
-            # 💡 옵션에 font_path를 추가해서 cannot open resource 에러 방지
             options = {"write_text": True, "font_size": 10, "dpi": 300, "font_path": font_p}
             my_barcode.write(fp, options=options) 
             barcode_img = Image.open(fp).convert('RGBA')
@@ -109,8 +106,12 @@ def generate_barcode():
         current_barcode_pil = final_img
         current_barcode_data = data
         
-        display_w = 480
-        display_h = int(final_img.size[1] * (display_w / final_img.size[0]))
+        # 💡 [수정] 프리뷰 박스(600x250)에 맞춰 이미지가 잘리지 않게 '비율 자동 조절'
+        max_w, max_h = 560, 230 
+        img_w, img_h = final_img.size
+        ratio = min(max_w / img_w, max_h / img_h)
+        display_w, display_h = int(img_w * ratio), int(img_h * ratio)
+        
         img_ctk = ctk.CTkImage(light_image=final_img, dark_image=final_img, size=(display_w, display_h))
         barcode_label.configure(image=img_ctk, text="")
         
@@ -171,13 +172,12 @@ def load_favorite(choice):
             break
     fav_combo.set("🌟 자주 쓰는 바코드 꺼내기...")
 
-
 # --- UI 메인 구성 ---
 root = ctk.CTk()
-root.title("Warehouse Pro v5.0 - Logistics Expert")
+root.title("Warehouse Pro v5.1 - Logistics Expert")
 root.geometry("1100x850")
 
-# 💡 배경 이미지 부활!
+# 💡 배경 이미지 (파일이 없으면 까만 배경 유지)
 try:
     bg_image_path = resource_path("logistic_future.jpg")
     bg_pil = Image.open(bg_image_path)
