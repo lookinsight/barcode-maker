@@ -31,9 +31,8 @@ ctk.set_default_color_theme("dark-blue")
 current_barcode_pil = None
 current_barcode_data = ""
 favorites_list = []
-history_list = [] # 💡 잃어버렸던 히스토리 리스트 부활!
+history_list = [] 
 
-# --- [기능 1] 즐겨찾기 자동 저장/로드 ---
 def load_favorites():
     global favorites_list
     if os.path.exists(FAV_FILE):
@@ -48,7 +47,6 @@ def save_favorites_to_file():
     with open(FAV_FILE, "w", encoding="utf-8") as f:
         json.dump(favorites_list, f, ensure_ascii=False, indent=4)
 
-# 💡 [핵심 기능] 긴 상품명을 바코드 폭에 맞춰 자동으로 줄바꿈 해주는 함수
 def wrap_text_korean(text, font, max_width, draw):
     if not text: return []
     lines = []
@@ -66,11 +64,10 @@ def wrap_text_korean(text, font, max_width, draw):
         lines.append(current_line)
     return lines
 
-# --- [기능 2] 최종 이미지 합성 (줄바꿈 + 여백 최적화) ---
 def create_final_barcode_image(barcode_img, data, product_name):
     margin = 25
     barcode_w = barcode_img.size[0]
-    max_text_w = barcode_w # 텍스트가 바코드 폭을 넘지 않도록 제한
+    max_text_w = barcode_w 
     
     try:
         font_p = resource_path("malgun.ttf")
@@ -88,7 +85,7 @@ def create_final_barcode_image(barcode_img, data, product_name):
     line_height = 0
     if lines:
         bbox = draw.textbbox((0,0), "A", font=title_font)
-        line_height = bbox[3] - bbox[1] + 8 # 줄 간격 8px 추가
+        line_height = bbox[3] - bbox[1] + 8 
         
     header_height = (len(lines) * line_height) + 20 if product_name else 10
     
@@ -102,14 +99,13 @@ def create_final_barcode_image(barcode_img, data, product_name):
         for line in lines:
             bbox = draw.textbbox((0, 0), line, font=title_font)
             text_w = bbox[2] - bbox[0]
-            x_text = margin + (barcode_w - text_w) // 2 # 가운데 정렬
+            x_text = margin + (barcode_w - text_w) // 2 
             draw.text((x_text, y_text), line, font=title_font, fill="black")
             y_text += line_height
 
     final_img.paste(barcode_img, (margin, header_height))
     return final_img
 
-# --- [기능 3] 바코드 생성 로직 ---
 def generate_barcode():
     global current_barcode_pil, current_barcode_data
     data = entry.get()
@@ -133,7 +129,6 @@ def generate_barcode():
             code_class = barcode.get_barcode_class(b_type.lower().replace(" ", ""))
             my_barcode = code_class(data, writer=ImageWriter())
             
-            # 💡 [핵심 수정] 글자는 더 작게(6), 바코드와의 거리는 더 멀게(6.0)
             options = {"write_text": True, "font_size": 6, "dpi": 300, "font_path": font_p, "text_distance": 6.0}
             my_barcode.write(fp, options=options) 
             barcode_img = Image.open(fp).convert('RGBA')
@@ -154,22 +149,19 @@ def generate_barcode():
         print_btn_full.configure(state="normal")
         print_btn_half.configure(state="normal")
         
-        # 💡 생성할 때마다 히스토리에 기록 (상품명 포함)
         add_to_history(data, b_type, p_name, final_img)
         
     except Exception as e:
         messagebox.showerror("오류", f"생성 실패: {e}")
 
-# --- [기능 4] 생성 히스토리 시스템 (복구 완료!) ---
 def add_to_history(data, b_type, p_name, img):
     global history_list
-    # 중복 제거
     for item in history_list:
         if item['data'] == data and item['type'] == b_type and item.get('p_name') == p_name:
             history_list.remove(item)
             break
     history_list.insert(0, {'data': data, 'type': b_type, 'p_name': p_name, 'pil_img': img})
-    if len(history_list) > 10: # 최대 10개 유지
+    if len(history_list) > 10: 
         history_list.pop()
     display_history_list()
 
@@ -186,7 +178,6 @@ def display_history_list():
         item_frame = ctk.CTkFrame(history_scroll, fg_color="transparent")
         item_frame.pack(side="left", padx=5)
         
-        # 히스토리 버튼 이름: 상품명이 있으면 상품명, 없으면 데이터 표시
         display_text = item.get('p_name', '')
         if not display_text: display_text = item['data']
         if len(display_text) > 8: display_text = display_text[:8] + ".."
@@ -220,7 +211,6 @@ def display_history_item(index):
     
     barcode_label.configure(image=img_ctk, text="") 
     
-    # 입력칸 복구
     entry.delete(0, 'end')
     entry.insert(0, item['data'])
     type_combo.set(item['type'])
@@ -231,7 +221,6 @@ def display_history_item(index):
     print_btn_full.configure(state="normal")
     print_btn_half.configure(state="normal")
 
-# --- [기능 5] 인쇄 및 즐겨찾기 ---
 def print_barcode(size_mode):
     if not current_barcode_pil: return
     try:
@@ -261,7 +250,6 @@ def add_to_favorites():
         return
     
     if not any(f['data'] == data for f in favorites_list):
-        # 💡 즐겨찾기 저장 시 상품명도 포함!
         favorites_list.append({'data': data, 'type': b_type, 'p_name': p_name})
         save_favorites_to_file()
         update_fav_combo()
@@ -279,7 +267,6 @@ def load_favorite(choice):
             entry.delete(0, 'end')
             entry.insert(0, f['data'])
             type_combo.set(f['type'])
-            # 💡 즐겨찾기 불러올 때 상품명도 쏙 불러오기!
             product_entry.delete(0, 'end')
             product_entry.insert(0, f.get('p_name', ''))
             generate_barcode()
@@ -288,8 +275,8 @@ def load_favorite(choice):
 
 # --- UI 메인 구성 ---
 root = ctk.CTk()
-root.title("Warehouse Pro v5.3 - Logistics Expert") 
-root.geometry("1100x850") # 레이아웃 최적화를 위해 높이 조정
+root.title("Warehouse Pro v5.4 - Logistics Expert") 
+root.geometry("1100x850") 
 
 try:
     bg_image_path = resource_path("logistic_future.jpg")
@@ -308,8 +295,17 @@ main_container.place(relx=0.5, rely=0.5, anchor="center", relwidth=0.85, relheig
 header = ctk.CTkLabel(main_container, text="Logistics Barcode Generator", font=ctk.CTkFont(size=36, weight="bold"))
 header.pack(pady=(20, 20))
 
-product_entry = ctk.CTkEntry(main_container, width=500, height=45, placeholder_text="[상품명 입력] 바코드 상단에 인쇄됩니다.")
-product_entry.pack(pady=(0, 15))
+# 💡 [핵심 수정] 상품명 입력칸 옆에 '지우기(X)' 버튼 추가
+product_frame = ctk.CTkFrame(main_container, fg_color="transparent")
+product_frame.pack(pady=(0, 15))
+
+product_entry = ctk.CTkEntry(product_frame, width=450, height=45, placeholder_text="[상품명 입력] 바코드 상단에 인쇄됩니다.")
+product_entry.pack(side="left", padx=(0, 5))
+
+product_clear_btn = ctk.CTkButton(product_frame, text="X", width=45, height=45, font=ctk.CTkFont(weight="bold", size=16), 
+                                  fg_color="#ef4444", hover_color="#dc2626", 
+                                  command=lambda: product_entry.delete(0, 'end'))
+product_clear_btn.pack(side="left")
 
 input_frame = ctk.CTkFrame(main_container, fg_color="transparent")
 input_frame.pack(pady=5)
@@ -346,7 +342,6 @@ print_btn_half.pack(side="left", padx=10)
 save_button = ctk.CTkButton(main_container, text="Save as PNG", width=200, height=35, state="disabled", command=lambda: current_barcode_pil.save(f"barcode_{current_barcode_data}.png"))
 save_button.pack(pady=5)
 
-# 💡 부활한 생성 히스토리 UI 영역!
 ctk.CTkLabel(main_container, text="생성 히스토리", font=ctk.CTkFont(size=14, weight="bold"), text_color="#A0A0A0").pack(pady=(5, 0))
 history_scroll = ctk.CTkScrollableFrame(main_container, height=60, orientation="horizontal", fg_color="transparent", scrollbar_button_color=("gray60", "gray40"), border_width=0)
 history_scroll.pack(fill="x", padx=40, pady=(0, 5))
