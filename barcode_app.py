@@ -47,7 +47,6 @@ def save_favorites_to_file():
         json.dump(favorites_list, f, ensure_ascii=False, indent=4)
 
 def create_final_barcode_image(barcode_img, data, product_name):
-    # 💡 [수정] ICQA 로고 영역(lw) 삭제 및 여백 조정
     margin = 25
     header_height = 60 if product_name else 10
     
@@ -56,23 +55,20 @@ def create_final_barcode_image(barcode_img, data, product_name):
     final_img = Image.new('RGBA', (new_w, new_h), 'white')
     draw = ImageDraw.Draw(final_img)
     
-    # 💡 [수정] 상품명 폰트 크기를 더 크게 (22pt -> 26pt로 1~2단계 업)
     try:
-        # 깃허브 배포를 위해 malgun.ttf 사용. (로컬 테스트 시 경로 수정 필요할 수 있음)
         font_p = resource_path("malgun.ttf")
         title_font = ImageFont.truetype(font_p, 26) 
     except:
         title_font = ImageFont.load_default()
 
-    # 💡 [수정] "ITEM:" 제거하고 상품명만 표시
     if product_name:
-        # 텍스트 세로 중앙 정렬을 위해 header_height 고려
-        text_w, text_h = draw.textsize(product_name, font=title_font)
+        # 💡 [핵심 수정] 최신 Pillow 라이브러리에 맞춰 글자 크기 계산 방식(textbbox)으로 변경!
+        bbox = draw.textbbox((0, 0), product_name, font=title_font)
+        text_w = bbox[2] - bbox[0]
+        text_h = bbox[3] - bbox[1]
         draw.text((margin, (header_height - text_h) // 2), product_name, font=title_font, fill="black")
 
     final_img.paste(barcode_img, (margin, header_height))
-    
-    # ICQA 로고 그리는 코드 삭제 완료
     
     return final_img
 
@@ -88,7 +84,6 @@ def generate_barcode():
         
     try:
         fp = io.BytesIO()
-        # 바코드 데이터 숫자 폰트 (Arial 사용)
         font_p = resource_path("arial.ttf") 
 
         if b_type == "QR Code":
@@ -100,7 +95,6 @@ def generate_barcode():
             code_class = barcode.get_barcode_class(b_type.lower().replace(" ", ""))
             my_barcode = code_class(data, writer=ImageWriter())
             
-            # 💡 [수정] 바코드 데이터 글자 크기를 더 작게 (10pt -> 8pt로 축소)
             options = {"write_text": True, "font_size": 8, "dpi": 300, "font_path": font_p, "text_distance": 3.0}
             my_barcode.write(fp, options=options) 
             barcode_img = Image.open(fp).convert('RGBA')
@@ -109,7 +103,6 @@ def generate_barcode():
         current_barcode_pil = final_img
         current_barcode_data = data
         
-        # 프리뷰 박스 비율 조절
         max_w, max_h = 560, 230 
         img_w, img_h = final_img.size
         ratio = min(max_w / img_w, max_h / img_h)
@@ -124,8 +117,6 @@ def generate_barcode():
         
     except Exception as e:
         messagebox.showerror("오류", f"생성 실패: {e}")
-
-# ... [중략: print_barcode, 즐겨찾기 관련 함수는 v5.1과 동일] ...
 
 def print_barcode(size_mode):
     if not current_barcode_pil: return
@@ -179,7 +170,7 @@ def load_favorite(choice):
 
 # --- UI 메인 구성 ---
 root = ctk.CTk()
-root.title("Warehouse Pro v5.2 - Logistics Expert") # 버전 업데이트
+root.title("Warehouse Pro v5.2 - Logistics Expert") 
 root.geometry("1100x850")
 
 try:
