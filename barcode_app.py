@@ -64,13 +64,12 @@ def wrap_text_korean(text, font, max_width, draw):
         lines.append(current_line)
     return lines
 
-# --- [기능 1] 최종 이미지 합성 (간격 최적화) ---
 def create_final_barcode_image(barcode_img, data, product_name):
     margin = 25
     barcode_w = barcode_img.size[0]
     barcode_h = barcode_img.size[1]
     
-    # 💡 [핵심 설정] 상품명 <-> 바코드 <-> 데이터 텍스트 사이의 동일한 간격 기준 (20px)
+    # 💡 간격 기준 (상품명과 바코드, 바코드와 데이터 사이의 여백)
     inter_element_spacing = 20 
     
     try:
@@ -89,30 +88,25 @@ def create_final_barcode_image(barcode_img, data, product_name):
     line_height = 0
     if lines:
         bbox = draw.textbbox((0,0), "A", font=title_font)
-        line_height = bbox[3] - bbox[1] + 8 # 줄 간격 8px 추가
+        line_height = bbox[3] - bbox[1] + 8 
         
-    # 상품명 아래 간격 설정
     header_height = (len(lines) * line_height) + inter_element_spacing if product_name else 10
     
-    # 데이터 텍스트 폰트 로드 (크기 계산을 위해 미리 로드)
+    # 💡 [핵심 수정] 데이터 텍스트 폰트 크기를 고해상도에 맞춰 8 -> 22로 대폭 상향!
     try:
         font_p = resource_path("arial.ttf")
-        # 기존 포인트: 6pt -> 픽셀 변환 시 약 8px
-        data_font = ImageFont.truetype(font_p, 8) 
+        data_font = ImageFont.truetype(font_p, 22) 
     except:
         data_font = ImageFont.load_default()
         
-    # 데이터 텍스트 높이 계산
     bbox = draw.textbbox((0, 0), data, font=data_font)
     data_text_h = bbox[3] - bbox[1]
     
-    # 캔버스 최종 크기 계산 (상품명 영역 + 바코드 높이 + 데이터 영역 + 최종 하단 여백 10)
     new_w = barcode_w + (margin * 2)
-    new_h = barcode_h + header_height + inter_element_spacing + data_text_h + 10
+    new_h = barcode_h + header_height + inter_element_spacing + data_text_h + 15
     final_img = Image.new('RGBA', (new_w, new_h), 'white')
     draw = ImageDraw.Draw(final_img)
     
-    # 1. 상품명 그리기
     if product_name:
         y_text = 10
         for line in lines:
@@ -122,21 +116,17 @@ def create_final_barcode_image(barcode_img, data, product_name):
             draw.text((x_text, y_text), line, font=title_font, fill="black")
             y_text += line_height
 
-    # 2. 바코드 붙이기
     final_img.paste(barcode_img, (margin, header_height))
     
-    # 3. 바코드 데이터 텍스트 그리기 (수동)
-    # 데이터 텍스트 그릴 위치 계산 (바코드 아래 동일 여백)
+    # 바코드 데이터 텍스트 그리기
     y_data_text = header_height + barcode_h + inter_element_spacing
     bbox = draw.textbbox((0, 0), data, font=data_font)
     text_w = bbox[2] - bbox[0]
-    # 바코드 폭 내에서 가운데 정렬
     x_data_text = margin + (barcode_w - text_w) // 2
     draw.text((x_data_text, y_data_text), data, font=data_font, fill="black")
     
     return final_img
 
-# --- [기능 2] 바코드 생성 로직 ---
 def generate_barcode():
     global current_barcode_pil, current_barcode_data
     data = entry.get()
@@ -160,8 +150,7 @@ def generate_barcode():
             code_class = barcode.get_barcode_class(b_type.lower().replace(" ", ""))
             my_barcode = code_class(data, writer=ImageWriter())
             
-            # 💡 [핵심 수정] 글자는 그리지 않도록 설정 (수동 그리기)
-            # options = {"write_text": True, "font_size": 6, "dpi": 300, "font_path": font_p, "text_distance": 6.0}
+            # 바코드 그릴 때 자동 글자 삽입 기능은 끄기 (수동으로 그리기 위해)
             options = {"write_text": False, "font_size": 6, "dpi": 300, "font_path": font_p}
             my_barcode.write(fp, options=options) 
             barcode_img = Image.open(fp).convert('RGBA')
@@ -187,7 +176,6 @@ def generate_barcode():
     except Exception as e:
         messagebox.showerror("오류", f"생성 실패: {e}")
 
-# --- [기능 3] 생성 히스토리 시스템 ---
 def add_to_history(data, b_type, p_name, img):
     global history_list
     for item in history_list:
@@ -255,7 +243,6 @@ def display_history_item(index):
     print_btn_full.configure(state="normal")
     print_btn_half.configure(state="normal")
 
-# --- [기능 4] 인쇄 및 즐겨찾기 ---
 def print_barcode(size_mode):
     if not current_barcode_pil: return
     try:
@@ -310,7 +297,7 @@ def load_favorite(choice):
 
 # --- UI 메인 구성 ---
 root = ctk.CTk()
-root.title("Warehouse Pro v5.5 - Logistics Expert") 
+root.title("Warehouse Pro v5.6 - Logistics Expert") 
 root.geometry("1100x850") 
 
 try:
