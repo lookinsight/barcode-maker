@@ -1,39 +1,37 @@
-name: Build Warehouse Pro EXE
+name: Build EXE
 
-# 코드가 main 브랜치에 올라가거나(push), 수동으로 실행할 때 작동합니다.
 on:
   push:
     branches: [ "main" ]
-  workflow_dispatch:
 
 jobs:
   build:
-    # 윈도우 환경에서 실행 파일을 만듭니다.
     runs-on: windows-latest
 
     steps:
-    - name: 소스 코드 가져오기
+    - name: Checkout code
       uses: actions/checkout@v4
-      
-    - name: 파이썬 환경 세팅
+
+    - name: Set up Python
       uses: actions/setup-python@v5
       with:
         python-version: '3.10'
-        
-    - name: 필수 라이브러리 설치 (재민이가 알려준 도구들)
+
+    - name: Install dependencies
       run: |
         python -m pip install --upgrade pip
         pip install python-barcode pillow customtkinter pyinstaller qrcode pywin32
-        
-    - name: 폰트 준비하기
+
+    - name: Prepare Font (Arial)
+      # 💡 Arial은 깃허브 로봇 컴퓨터에 기본으로 있으니 복사해 오라고 시킵니다.
       run: copy C:\Windows\Fonts\arial.ttf .
-        
-    - name: PyInstaller로 EXE 파일 만들기
-      run: 
-        pyinstaller --noconsole --onefile --add-data "arial.ttf;." --name "Warehouse_Pro_v5" barcode_app.py
-        
-    - name: 완성된 EXE 파일 업로드하기
+
+    - name: Build with PyInstaller
+      # 💡 [핵심] arial, malgun, 배경 이미지까지 3개를 몽땅 EXE 안에 묶어서 포장합니다!
+      run: pyinstaller --noconsole --onefile --add-data "arial.ttf;." --add-data "malgun.ttf;." --add-data "logistic_future.jpg;." --name "Warehouse_Pro_v5.1" barcode_app.py
+
+    - name: Upload EXE
       uses: actions/upload-artifact@v4
       with:
-        name: Warehouse_Pro_v5_Executable
-        path: dist/Warehouse_Pro_v5.exe
+        name: Warehouse_Pro_v5.1_EXE
+        path: dist/Warehouse_Pro_v5.1.exe
