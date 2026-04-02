@@ -69,7 +69,6 @@ def create_final_barcode_image(barcode_img, data, product_name):
     barcode_w = barcode_img.size[0]
     barcode_h = barcode_img.size[1]
     
-    # 💡 간격 기준 (상품명과 바코드, 바코드와 데이터 사이의 여백)
     inter_element_spacing = 20 
     
     try:
@@ -92,7 +91,6 @@ def create_final_barcode_image(barcode_img, data, product_name):
         
     header_height = (len(lines) * line_height) + inter_element_spacing if product_name else 10
     
-    # 💡 [핵심 수정] 데이터 텍스트 폰트 크기를 고해상도에 맞춰 8 -> 22로 대폭 상향!
     try:
         font_p = resource_path("arial.ttf")
         data_font = ImageFont.truetype(font_p, 22) 
@@ -118,7 +116,6 @@ def create_final_barcode_image(barcode_img, data, product_name):
 
     final_img.paste(barcode_img, (margin, header_height))
     
-    # 바코드 데이터 텍스트 그리기
     y_data_text = header_height + barcode_h + inter_element_spacing
     bbox = draw.textbbox((0, 0), data, font=data_font)
     text_w = bbox[2] - bbox[0]
@@ -150,7 +147,6 @@ def generate_barcode():
             code_class = barcode.get_barcode_class(b_type.lower().replace(" ", ""))
             my_barcode = code_class(data, writer=ImageWriter())
             
-            # 바코드 그릴 때 자동 글자 삽입 기능은 끄기 (수동으로 그리기 위해)
             options = {"write_text": False, "font_size": 6, "dpi": 300, "font_path": font_p}
             my_barcode.write(fp, options=options) 
             barcode_img = Image.open(fp).convert('RGBA')
@@ -243,24 +239,78 @@ def display_history_item(index):
     print_btn_full.configure(state="normal")
     print_btn_half.configure(state="normal")
 
+# 💡 [핵심 기능 업데이트] A4 용지에 수량만큼 다중 배치하여 인쇄하는 함수
 def print_barcode(size_mode):
     if not current_barcode_pil: return
+    
+    # 사용자가 입력한 수량 가져오기
+    try:
+        qty = int(print_qty_entry.get())
+        if qty <= 0: raise ValueError
+    except:
+        messagebox.showwarning("입력 오류", "출력 수량에 올바른 숫자를 입력해주세요.")
+        return
+
     try:
         printer_name = win32print.GetDefaultPrinter()
         hDC = win32ui.CreateDC()
         hDC.CreatePrinterDC(printer_name)
         
-        w_px = 900 if size_mode == "full" else 450
-        h_px = 500
+        # A4 용지 픽셀 크기 (약 300 DPI 기준)
+        A4_W, A4_H = 2480, 3508 
         
-        hDC.StartDoc(f"Barcode_{current_barcode_data}")
-        hDC.StartPage()
-        dib = ImageWin.Dib(current_barcode_pil)
-        dib.draw(hDC.GetHandleOutput(), (100, 100, 100 + w_px, 100 + h_px))
-        hDC.EndPage()
+        if size_mode == "full":
+            cols, rows = 2, 5
+            cell_w, cell_h = 1100, 650 
+        else:
+            cols, rows = 4, 5
+            cell_w, cell_h = 550, 650
+
+        items_per_page = cols * rows
+        
+        # 바코드가 중앙에 예쁘게 배치되도록 여백 계산
+        margin_x = (A4_W - (cols * cell_w)) // 2
+        margin_y = (A4_H - (rows * cell_h)) // 2
+
+        # 바코드를 정해진 크기(cell) 안에 쏙 들어가게 비율 유지하며 줄이기
+        img_w, img_h = current_barcode_pil.size
+        ratio = min((cell_w - 40) / img_w, (cell_h - 40) / img_h) # 40px은 칸 안의 여유 공간
+        new_w, new_h = int(img_w * ratio), int(img_h * ratio)
+        print_img = current_barcode_pil.resize((new_w, new_h), Image.Resampling.LANCZOS)
+
+        hDC.StartDoc(f"Barcode_A4_{current_barcode_data}")
+        
+        printed_count = 0
+        while printed_count < qty:
+            hDC.StartPage()
+            # 하얀 A4 도화지 1장 만들기
+            page_img = Image.new('RGB', (A4_W, A4_H), 'white')
+            
+            # 이번 장에 몇 개를 그릴지 계산
+            items_this_page = min(items_per_page, qty - printed_count)
+            for i in range(items_this_page):
+                r = i // cols
+                c = i % cols
+                # 배치할 좌표 계산 (중앙 정렬)
+                x = margin_x + (c * cell_w) + (cell_w - new_w) // 2
+                y = margin_y + (r * cell_h) + (cell_h - new_h) // 2
+                # A4 도화지에 바코드 도장 쾅쾅 찍기 (투명도 유지)
+                page_img.paste(print_img, (x, y), print_img) 
+                
+            # 프린터의 실제 인쇄 가능 영역 가져오기
+            printer_w = hDC.GetDeviceCaps(8) # 가로
+            printer_h = hDC.GetDeviceCaps(10) # 세로
+            
+            # 완성된 A4 도화지를 프린터로 전송
+            dib = ImageWin.Dib(page_img)
+            dib.draw(hDC.GetHandleOutput(), (0, 0, printer_w, printer_h))
+            
+            hDC.EndPage()
+            printed_count += items_this_page
+
         hDC.EndDoc()
         hDC.DeleteDC()
-        messagebox.showinfo("인쇄", "프린터로 전송되었습니다.")
+        messagebox.showinfo("인쇄 완료", f"총 {qty}개의 바코드가 A4 용지에 정렬되어 프린터로 전송되었습니다.")
     except Exception as e:
         messagebox.showerror("인쇄 오류", f"프린터 연결을 확인하세요: {e}")
 
@@ -297,7 +347,7 @@ def load_favorite(choice):
 
 # --- UI 메인 구성 ---
 root = ctk.CTk()
-root.title("Warehouse Pro v5.6 - Logistics Expert") 
+root.title("Warehouse Pro v5.7 - Logistics Expert") 
 root.geometry("1100x850") 
 
 try:
@@ -353,8 +403,15 @@ barcode_display_frame.pack_propagate(False)
 barcode_label = ctk.CTkLabel(barcode_display_frame, text="Barcode Preview", text_color="gray")
 barcode_label.pack(expand=True)
 
+# 💡 [UI 수정] 인쇄 버튼 옆에 수량 입력칸 추가
 print_frame = ctk.CTkFrame(main_container, fg_color="transparent")
 print_frame.pack(pady=5)
+
+ctk.CTkLabel(print_frame, text="출력 수량:", font=ctk.CTkFont(size=14, weight="bold")).pack(side="left", padx=(0, 5))
+print_qty_entry = ctk.CTkEntry(print_frame, width=60, justify="center", font=ctk.CTkFont(size=16))
+print_qty_entry.insert(0, "1") # 기본값 1장
+print_qty_entry.pack(side="left", padx=(0, 15))
+
 print_btn_full = ctk.CTkButton(print_frame, text="🖨️ 명함 크기 인쇄", state="disabled", command=lambda: print_barcode("full"))
 print_btn_full.pack(side="left", padx=10)
 print_btn_half = ctk.CTkButton(print_frame, text="🖨️ 1/2 크기 인쇄", state="disabled", command=lambda: print_barcode("half"))
